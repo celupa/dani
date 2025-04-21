@@ -1,3 +1,0 @@
-Features
-    - STT: OPENAI Whisper (?)
-    - LLM: 
