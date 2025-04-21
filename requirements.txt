@@ -1,2 +1,11 @@
+# 
 # python=3.11.12
 # uv
+
+# required
+openai
+
+# optional
+# sudo apt-get install libportaudio2 (ubuntu)
+sounddevice
+scipy
