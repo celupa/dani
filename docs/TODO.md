@@ -22,6 +22,8 @@ TODO
 - Optimization
     - Why are we using wave file instead of mp3 or any other format?
     - Look into optimizing/compressing audiofiles
+    - Review prompt_llm settings (temperature max_tokens) and defaults
+    - Implement OPENAI Credit check
 - Cleanup
     - Make sure audiofiles are deleted on user machine (both in /tmp and /tmp/gradio)
 
@@ -44,8 +46,10 @@ Beyond
 - UI:
     - 
 - Features
+    - Refactor code to accomodate model placeholders (to facilitate interchangeability)
     - Implement multilinguality for app UI
     - Implement language check for the STT-LLM-TTS-Pipeline (does it exist?)
     - Memory (assess students levels, interests and level over time)
+    - Implement writting section
 - LLM
     -  Extend instruction capabilities (allow users to define personality and assistant name...)

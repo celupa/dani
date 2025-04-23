@@ -6,6 +6,8 @@
 openai
 
 # optional
-# sudo apt-get install libportaudio2 (ubuntu)
+# to record sound in python
 sounddevice
 scipy
+# to play sounds in python (doesn't work in ubuntu)
+playsound
