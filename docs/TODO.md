@@ -19,6 +19,11 @@ TODO
         - Text and audio
 - Audio
     - May need to either use a different audio plugin or containerize app (had to sudo apt install python3-pyaudio)
+- Optimization
+    - Why are we using wave file instead of mp3 or any other format?
+    - Look into optimizing/compressing audiofiles
+- Cleanup
+    - Make sure audiofiles are deleted on user machine (both in /tmp and /tmp/gradio)
 
 Features
 - STT
