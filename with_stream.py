@@ -1,25 +1,5 @@
-from dotenv import load_dotenv
-from pathlib import Path
-import os
-import tempfile
-from typing import List, Tuple, Optional, Sequence, Dict, Any
-
-import gradio as gr
-import openai
-from pydub import AudioSegment
-
-
-#auth
-load_dotenv()
-openai_token = os.getenv("OPENAI_TOKEN")
-client = openai.OpenAI(api_key=openai_token)
-# tmp
-SYSTEM_PROMPT = (
-    "You are a helpful, concise voice assistant. "
-    "Answer clearly and keep replies short unless further detail is requested."
-)
-
-
+# TODO: audio stream is delayed until processing, need to find a way to stream
+# audio as it comes in 
 def _ensure_wav(audio_path: str) -> str:
     """
     convert arbitrary audio to 16kHz mono WAV (openai's preferred format).
@@ -76,7 +56,7 @@ def prompt_stt(audio_filepath: str) -> str:
     return response.strip()
 
 def prompt_llm(conversation: List[Tuple[str, str]]) -> str:
-    """fetch response from llm (gpt-4o-mini)."""
+    """Fetch response from llm (gpt-4o-mini). Also includes streaming."""
 
     # convert gradio history to openai messages
     messages = _history_to_messages(conversation)
@@ -87,8 +67,13 @@ def prompt_llm(conversation: List[Tuple[str, str]]) -> str:
         messages=messages,
         max_tokens=512,
         temperature=0.7,
+        stream=True
     )
-    return response.choices[0].message.content.strip()
+    
+    for chunk in response:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
 
 def prompt_tts(text: str) -> str:
     """convert llm text output to speech (gpt-4o-mini-tts, onyx voice)."""
@@ -100,10 +85,11 @@ def prompt_tts(text: str) -> str:
         input=text,
         response_format="wav",
     ) as response:
-        out_path = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
-        response.stream_to_file(out_path)
-
-        return out_path
+        for chunk in resp.iter_bytes(chunk_size=4096):
+            yield chunk          # each chunk goes straight to the frontend
+        # out_path = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+        # response.stream_to_file(out_path)
+        # return out_path
 
 def process_voice_message(
     audio: Optional[str],
@@ -112,7 +98,8 @@ def process_voice_message(
     """string the stt-llm-tts pipeline together."""
 
     if audio is None:
-        return None, chat_history
+        yield None, chat_history
+        return
 
     # transcribe speech to text
     try:
@@ -123,15 +110,28 @@ def process_voice_message(
              "content": "The assistant has unexpectedly gone blind. Please reach out to your local developper."}
         )
         print(e)
-        return None, chat_history
+        yield None, chat_history
+        return
 
     chat_history.append({"role": "user", "content": user_text})
+    yield gr.update(), chat_history
 
     # get llm response
+    assistant_text = ""
     try:
-        assistant_text = prompt_llm(chat_history)
+        assistant_text = ""                       # we build this up chunk by chunk
+        for delta in prompt_llm(_history_to_messages(chat_history)):
+            assistant_text += delta
+
+            # if the assistant message already exists, overwrite it; else append
+            if chat_history and chat_history[-1]["role"] == "assistant":
+                chat_history[-1]["content"] = assistant_text
+            else:
+                chat_history.append({"role": "assistant", "content": assistant_text})
+
+            # push partial text to UI
+            yield gr.update(), chat_history
     except Exception as e:
-        # chat_history[-1] = (user_text, "LLM response is broken! Reach out to your local developper.")
         chat_history.append(
              {"role": "assistant",
              "content": "The assistant just suffered an aneurysm. Please reach out to your local developper."}
@@ -139,11 +139,14 @@ def process_voice_message(
         print(e)
         return None, chat_history
 
-    chat_history.append({"role": "assistant", "content": assistant_text})
+    # chat_history.append({"role": "assistant", "content": assistant_text})
 
     # get text to speech
     try:
-        audio_reply = prompt_tts(assistant_text)
+        for chunk in prompt_tts(assistant_text):
+            # first positional output is audio_out, second is chatbot
+            yield chunk, chat_history   # chat history is unchanged here
+        # audio_reply = prompt_tts(assistant_text)
     except Exception as e:
         chat_history.append(
             {"role": "assistant",
@@ -152,7 +155,7 @@ def process_voice_message(
         print(e)
         audio_reply = None 
 
-    return audio_reply, chat_history
+    yield gr.update(value=audio_reply, autoplay=True), chat_history
 
 def build_app() -> gr.Blocks:
     # show send button and clear assistant output on new recording
@@ -234,6 +237,9 @@ def build_app() -> gr.Blocks:
         # hide send button until next recording
         send_chain.then(lambda: gr.update(visible=False), None, [send_btn])
 
+        # queue app for streaming 
+        # TODO, what is queue, anyway?
+        demo.queue()
         demo.launch()
 
     return demo
