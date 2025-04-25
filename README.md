@@ -9,6 +9,7 @@ Aimed at students that already have english basics and would like to take it bey
 - Describe LLM Model (gpt-4o-mini, $0.015/min)
 - Describe TTS Model (gpt-4o-mini-tts, $0.015/min)
 - DOUBLE CHECK PRICES, BLOODY BENCHOD
+- Talk about streaming 
 
 # Howto (use)
 - Include usage screenshots
